@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Climate Promaster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --sand: #f0ebe2;
+  --sand-mid: #e5ddd0;
+  --sand-deep: #cec4b4;
+  --ink: #1c1814;
+  --ink2: #3d3630;
+  --muted: #8a7f72;
+  --muted-lt: #b0a898;
+  --surface: #faf8f4;
+  --surface2: #f0ebe2;
+  --border: rgba(28,24,20,0.10);
+  --border-md: rgba(28,24,20,0.16);
+  --accent: #2c5fa8;
+  --accent-warm: #b85c2c;
+  --sidebar: 296px;
+  --header: 54px;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--sand);
+  color: var(--ink);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── HEADER ── */
+header {
+  position: relative;
+  z-index: 1000;
+  height: var(--header);
+  background: rgba(241,236,226,0.98);
+  border-bottom: 1px solid var(--border-md);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.logo {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 22px;
+  color: var(--ink);
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-md);
+  flex-shrink: 0;
+}
+
+.search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 280px;
+  height: 34px;
+  border: 1px solid var(--border-md);
+  border-radius: 6px;
+  padding: 0 12px;
+  background: rgba(255,255,255,0.56);
+  transition: border-color 0.15s, background 0.15s;
+}
+.search-wrap:focus-within {
+  border-color: rgba(44,95,168,0.34);
+  background: #fffdf8;
+}
+.search-wrap svg { color: var(--muted); flex-shrink: 0; }
+.search-wrap input {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--ink);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  width: 100%;
+}
+.search-wrap input::placeholder { color: var(--muted-lt); }
+
+.spacer { flex: 1; }
+
+.clock {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.unit-btn {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  border: 1px solid var(--border-md);
+  background: transparent;
+  color: var(--ink2);
+  transition: all 0.15s;
+  letter-spacing: 0.5px;
+}
+.unit-btn:hover { color: var(--ink); border-color: rgba(28,24,20,0.26); background: rgba(255,255,255,0.62); }
+
+.layer-group {
+  display: flex;
+  border: 1px solid var(--border-md);
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.46);
+}
+.pill {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0 13px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--muted);
+  border: none;
+  border-right: 1px solid var(--border);
+  background: none;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+.pill:last-child { border-right: none; }
+.pill.active { background: #dfe8de; color: #243124; }
+.pill:hover:not(.active) { background: rgba(255,255,255,0.64); color: var(--ink); }
+
+/* ── BODY ── */
+.app-body { display: flex; flex: 1; overflow: hidden; }
+
+/* ── MAP ── */
+#map { flex: 1; height: 100%; z-index: 1; }
+.leaflet-container { background: #8f978f; }
+.base-tiles {
+  filter: brightness(0.72) saturate(0.82) contrast(1.08);
+}
+.weather-tiles {
+  filter: saturate(1.18) contrast(1.1);
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: var(--sidebar);
+  flex-shrink: 0;
+  background: rgba(241,236,226,0.98);
+  border-left: 1px solid var(--border-md);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 100;
+}
+
+.sid-top {
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.city-name {
+  font-family: 'Instrument Serif', serif;
+  font-size: 26px;
+  font-style: italic;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.city-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.3px;
+  display: flex;
+  gap: 10px;
+}
+
+.tag {
+  background: #e2eadf;
+  border: 1px solid rgba(36,49,36,0.14);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 9px;
+  color: #51624f;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  align-self: center;
+  margin-left: 4px;
+}
+
+.hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 22px 4px;
+}
+
+.temp-block { display: flex; align-items: flex-start; gap: 1px; }
+
+.temp-num {
+  font-family: 'Instrument Serif', serif;
+  font-size: 80px;
+  line-height: 0.88;
+  letter-spacing: -4px;
+  color: var(--ink);
+}
+
+.temp-deg {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 22px;
+  font-weight: 300;
+  color: #6f675d;
+  margin-top: 6px;
+}
+
+.wx-icon {
+  font-size: 40px;
+  line-height: 1;
+  margin-top: 8px;
+}
+
+.condition {
+  padding: 6px 22px 16px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  text-transform: capitalize;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Stats */
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-bottom: 1px solid var(--border);
+}
+
+.stat {
+  padding: 11px 14px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+.stat:nth-child(3n) { border-right: none; }
+.stat:nth-last-child(-n+3) { border-bottom: none; }
+
+.stat-label {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.stat-val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.5px;
+}
+
+.stat-unit {
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 1px;
+}
+
+/* Forecast */
+.forecast-wrap { padding: 16px 22px; flex: 1; overflow-y: auto; }
+
+.sec-label {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 1.2px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.fc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+.fc-row:last-child { border-bottom: none; }
+
+.fc-day {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink);
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.fc-icon { font-size: 16px; flex-shrink: 0; }
+
+.fc-bar-wrap {
+  flex: 1;
+  height: 2px;
+  background: rgba(28,24,20,0.18);
+  border-radius: 1px;
+  position: relative;
+  overflow: hidden;
+}
+.fc-bar {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 1px;
+  background: #698d61;
+}
+
+.fc-temps {
+  display: flex;
+  gap: 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.fc-hi { color: var(--ink); }
+.fc-lo { color: #6f675d; }
+
+/* Legend */
+.legend {
+  position: fixed;
+  bottom: 20px;
+  left: 64px;
+  z-index: 500;
+  background: rgba(250,248,244,0.96);
+  border: 1px solid var(--border-md);
+  border-radius: 8px;
+  padding: 10px 14px;
+  backdrop-filter: blur(10px);
+  min-width: 148px;
+}
+
+.legend-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 7px;
+}
+
+.legend-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #60a5fa, #34d399, #fbbf24, #f87171);
+  margin-bottom: 5px;
+}
+
+.legend-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+}
+
+/* Popup */
+.leaflet-popup-content-wrapper {
+  background: rgba(250,248,244,0.98) !important;
+  border: 1px solid rgba(28,24,20,0.16) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 24px rgba(28,24,20,0.12) !important;
+  font-family: 'DM Sans', sans-serif !important;
+  color: var(--ink) !important;
+}
+.leaflet-popup-tip { background: rgba(250,248,244,0.98) !important; }
+.atm-popup h3 { font-family: 'Instrument Serif', serif; font-style: italic; font-size: 16px; font-weight: normal; margin-bottom: 2px; color: var(--ink); }
+.atm-popup .pt { font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 500; color: var(--ink); letter-spacing: -1px; line-height: 1.1; }
+.atm-popup .pd { font-size: 11px; color: var(--muted); text-transform: capitalize; margin-top: 2px; }
+
+/* Loading */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--sand);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: opacity 0.5s;
+}
+.loading-overlay.fade { opacity: 0; pointer-events: none; }
+.load-logo {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 28px;
+  color: var(--ink);
+  letter-spacing: -0.5px;
+}
+.load-sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+}
+
+/* Zoom control */
+.leaflet-control-zoom {
+  border: 1px solid var(--border-md) !important;
+  border-radius: 7px !important;
+  overflow: hidden;
+  box-shadow: none !important;
+}
+.leaflet-control-zoom a {
+  background: var(--surface) !important;
+  color: var(--ink2) !important;
+  border-bottom: 1px solid var(--border) !important;
+  font-family: 'DM Sans', sans-serif !important;
+  font-weight: 400 !important;
+  width: 28px !important;
+  height: 28px !important;
+  line-height: 28px !important;
+}
+.leaflet-control-zoom a:hover { background: var(--surface2) !important; }
+.leaflet-control-zoom-out { border-bottom: none !important; }
+
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--sand-deep); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loader">
+  <div class="load-logo">Climate Promaster</div>
+  <div class="load-sub">initialising...</div>
+</div>
+
+<header>
+  <div class="logo">Climate Promaster</div>
+  <div class="divider"></div>
+
+  <div class="search-wrap">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+    </svg>
+    <input id="searchInput" type="text" placeholder="Search city…" />
+  </div>
+
+  <div class="spacer"></div>
+
+  <div class="clock" id="liveTime">--:--:--</div>
+  <div class="divider"></div>
+  <button class="unit-btn" id="unitToggle">°F</button>
+  <div class="divider"></div>
+
+  <div class="layer-group">
+    <button class="pill active" data-layer="clean">Clean</button>
+    <button class="pill" data-layer="temp">Temp</button>
+    <button class="pill" data-layer="wind">Wind</button>
+    <button class="pill" data-layer="rain">Rain</button>
+    <button class="pill" data-layer="cloud">Cloud</button>
+  </div>
+</header>
+
+<div class="app-body">
+  <div id="map"></div>
+
+  <div class="sidebar">
+    <div class="sid-top">
+      <div style="display:flex;align-items:baseline;gap:6px;">
+        <div class="city-name" id="sideCity">New York</div>
+        <div class="tag" id="sideUnit">°C</div>
+      </div>
+      <div class="city-meta">
+        <span id="sideCoords">40.7128° N · 74.0060° W</span>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="temp-block">
+        <div class="temp-num" id="sideTemp">--</div>
+        <div class="temp-deg">°</div>
+      </div>
+      <div class="wx-icon" id="sideIcon">🌤</div>
+    </div>
+
+    <div class="condition" id="sideCond">Loading weather data…</div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Feels</div>
+        <div class="stat-val"><span id="sFeels">--</span><span class="stat-unit">°</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Humidity</div>
+        <div class="stat-val"><span id="sHumid">--</span><span class="stat-unit">%</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">UV</div>
+        <div class="stat-val"><span id="sUV">--</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Wind</div>
+        <div class="stat-val"><span id="sWind">--</span><span class="stat-unit">m/s</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Pressure</div>
+        <div class="stat-val"><span id="sPress">--</span><span class="stat-unit">h</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Vis.</div>
+        <div class="stat-val"><span id="sVis">--</span><span class="stat-unit">km</span></div>
+      </div>
+    </div>
+
+    <div class="forecast-wrap">
+      <div class="sec-label">5-day forecast</div>
+      <div id="forecastList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="legend" id="mapLegend">
+  <div class="legend-title" id="legendTitle">Temperature</div>
+  <div class="legend-bar" id="legendBar"></div>
+  <div class="legend-labels">
+    <span id="legendLow">−40°</span>
+    <span id="legendMid1">0°</span>
+    <span id="legendMid2">20°</span>
+    <span id="legendHigh">50°</span>
+  </div>
+</div>
+
+<script>
+const API_KEY = 'a971c2a777181666faf3bfc7a6eca87e';
+let useFahrenheit = false;
+let currentLayer  = 'clean';
+let weatherLayer  = null;
+let map;
+
+const layerCodes = {
+  temp:  'temp_new',
+  wind:  'wind_new',
+  rain:  'precipitation_new',
+  cloud: 'clouds_new'
+};
+
+const legendData = {
+  temp:  { title: 'Temperature', labels: ['−40°','0°','20°','50°'],        gradient: 'linear-gradient(90deg,#60a5fa,#34d399,#fbbf24,#f87171)' },
+  wind:  { title: 'Wind speed',  labels: ['0','25','50','100+ m/s'],        gradient: 'linear-gradient(90deg,#e0f2fe,#7dd3fc,#2563eb,#1e1b4b)' },
+  rain:  { title: 'Rainfall',    labels: ['0','1 mm','10 mm','100+ mm'],    gradient: 'linear-gradient(90deg,#f0fdf4,#86efac,#16a34a,#14532d)' },
+  cloud: { title: 'Cloud cover', labels: ['0%','25%','75%','100%'],         gradient: 'linear-gradient(90deg,#faf8f4,#d1c8b8,#9c8f80,#3d3630)' }
+};
+
+const DAY = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function toF(c) { return Math.round(c * 9/5 + 32); }
+function display(c) { return useFahrenheit ? toF(c) : Math.round(c); }
+function unitStr() { return useFahrenheit ? '°F' : '°C'; }
+
+function wxEmoji(id) {
+  if (id >= 200 && id < 300) return '⛈';
+  if (id >= 300 && id < 400) return '🌦';
+  if (id >= 500 && id < 600) return '🌧';
+  if (id >= 600 && id < 700) return '❄️';
+  if (id >= 700 && id < 800) return '🌫';
+  if (id === 800) return '☀️';
+  if (id === 801) return '🌤';
+  if (id === 802) return '⛅';
+  return '🌥';
+}
+
+function initMap() {
+  map = L.map('map', { center: [30, 10], zoom: 3, zoomControl: false, attributionControl: false });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19, subdomains: 'abcd', className: 'base-tiles'
+  }).addTo(map);
+
+  // Labels rendered above weather
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19, subdomains: 'abcd', zIndex: 10
+  }).addTo(map);
+
+  L.control.zoom({ position: 'bottomleft' }).addTo(map);
+  L.control.attribution({ position: 'bottomright', prefix: '' })
+    .addAttribution('<span style="font-size:10px;color:#8a7f72">© OpenWeatherMap · © CartoDB</span>')
+    .addTo(map);
+
+  map.on('click', e => fetchByCoords(e.latlng.lat, e.latlng.lng, true));
+  fetchByCity('New York');
+  updateLegend('clean');
+}
+
+function addWeatherLayer(code) {
+  if (weatherLayer) map.removeLayer(weatherLayer);
+  if (!code) {
+    weatherLayer = null;
+    return;
+  }
+  weatherLayer = L.tileLayer(
+    `https://tile.openweathermap.org/map/${code}/{z}/{x}/{y}.png?appid=${API_KEY}`,
+    { opacity: 0.68, maxZoom: 19, zIndex: 5, className: 'weather-tiles' }
+  ).addTo(map);
+}
+
+function updateLegend(type) {
+  document.getElementById('mapLegend').style.display = type === 'clean' ? 'none' : '';
+  if (type === 'clean') return;
+  const d = legendData[type];
+  document.getElementById('legendTitle').textContent   = d.title;
+  document.getElementById('legendBar').style.background = d.gradient;
+  document.getElementById('legendLow').textContent     = d.labels[0];
+  document.getElementById('legendMid1').textContent    = d.labels[1];
+  document.getElementById('legendMid2').textContent    = d.labels[2];
+  document.getElementById('legendHigh').textContent    = d.labels[3];
+}
+
+async function fetchByCity(city) {
+  try {
+    const r = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`);
+    const d = await r.json();
+    if (!r.ok) {
+      alert(d.message || 'Weather request failed');
+      return;
+    }
+    updateSidebar(d);
+    map.flyTo([d.coord.lat, d.coord.lon], 8, { duration: 1.4 });
+    showPopup(d.coord.lat, d.coord.lon, d);
+    fetchForecast(d.coord.lat, d.coord.lon);
+  } catch(e) { console.error(e); }
+}
+
+async function fetchByCoords(lat, lon, popup = false) {
+  try {
+    const r = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`);
+    const d = await r.json();
+    updateSidebar(d);
+    if (popup) showPopup(lat, lon, d);
+    fetchForecast(lat, lon);
+  } catch(e) { console.error(e); }
+}
+
+async function fetchForecast(lat, lon) {
+  try {
+    const r = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&cnt=40`);
+    const d = await r.json();
+    renderForecast(d.list);
+  } catch(e) { console.error(e); }
+}
+
+function updateSidebar(d) {
+  document.getElementById('sideCity').textContent = d.name;
+  document.getElementById('sideUnit').textContent = unitStr();
+  const lat = Math.abs(d.coord.lat).toFixed(4) + '° ' + (d.coord.lat >= 0 ? 'N' : 'S');
+  const lon = Math.abs(d.coord.lon).toFixed(4) + '° ' + (d.coord.lon >= 0 ? 'E' : 'W');
+  document.getElementById('sideCoords').textContent = `${lat} · ${lon}`;
+  document.getElementById('sideTemp').textContent   = display(d.main.temp);
+  document.getElementById('sideIcon').textContent   = wxEmoji(d.weather[0].id);
+  document.getElementById('sideCond').textContent   = d.weather[0].description;
+  document.getElementById('sFeels').textContent     = display(d.main.feels_like);
+  document.getElementById('sHumid').textContent     = d.main.humidity;
+  document.getElementById('sWind').textContent      = d.wind.speed.toFixed(1);
+  document.getElementById('sPress').textContent     = d.main.pressure;
+  document.getElementById('sVis').textContent       = d.visibility ? (d.visibility / 1000).toFixed(1) : '--';
+  document.getElementById('sUV').textContent        = '--';
+}
+
+function showPopup(lat, lon, d) {
+  L.popup({ closeButton: false })
+    .setLatLng([lat, lon])
+    .setContent(`<div class="atm-popup">
+      <h3>${d.name}</h3>
+      <div class="pt">${display(d.main.temp)}${unitStr()}</div>
+      <div class="pd">${d.weather[0].description}</div>
+    </div>`)
+    .openOn(map);
+}
+
+function renderForecast(list) {
+  const byDay = {};
+  list.forEach(item => {
+    const date = new Date(item.dt * 1000);
+    const key  = date.toDateString();
+    if (!byDay[key]) byDay[key] = { temps: [], id: item.weather[0].id, date };
+    byDay[key].temps.push(item.main.temp);
+  });
+
+  const days5  = Object.values(byDay).slice(0, 5);
+  const allT   = days5.flatMap(d => d.temps);
+  const gMin   = Math.min(...allT);
+  const gRange = Math.max(...allT) - gMin || 1;
+
+  const el = document.getElementById('forecastList');
+  el.innerHTML = '';
+
+  days5.forEach((dd, i) => {
+    const hi    = Math.max(...dd.temps);
+    const lo    = Math.min(...dd.temps);
+    const bL    = ((lo - gMin) / gRange) * 60;
+    const bW    = ((hi - lo)   / gRange) * 60 + 8;
+    const label = i === 0 ? 'Now' : DAY[dd.date.getDay()];
+
+    const row = document.createElement('div');
+    row.className = 'fc-row';
+    row.innerHTML = `
+      <div class="fc-day">${label}</div>
+      <div class="fc-icon">${wxEmoji(dd.id)}</div>
+      <div class="fc-bar-wrap"><div class="fc-bar" style="left:${bL}%;width:${bW}%"></div></div>
+      <div class="fc-temps">
+        <span class="fc-hi">${display(hi)}°</span>
+        <span class="fc-lo">${display(lo)}°</span>
+      </div>`;
+    el.appendChild(row);
+  });
+}
+
+// Layer pills
+document.querySelectorAll('.pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    currentLayer = btn.dataset.layer;
+    addWeatherLayer(layerCodes[currentLayer]);
+    updateLegend(currentLayer);
+  });
+});
+
+// Search
+document.getElementById('searchInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const v = e.target.value.trim();
+    if (v) fetchByCity(v);
+  }
+});
+
+// Unit toggle
+document.getElementById('unitToggle').addEventListener('click', () => {
+  useFahrenheit = !useFahrenheit;
+  document.getElementById('unitToggle').textContent = useFahrenheit ? '°C' : '°F';
+  const city = document.getElementById('sideCity').textContent;
+  fetchByCity(city);
+});
+
+// Clock
+function tick() {
+  document.getElementById('liveTime').textContent =
+    new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
+tick();
+setInterval(tick, 1000);
+
+window.addEventListener('load', () => {
+  initMap();
+  updateLegend('temp');
+  setTimeout(() => {
+    document.getElementById('loader').classList.add('fade');
+    setTimeout(() => document.getElementById('loader').remove(), 600);
+  }, 900);
+});
+</script>
+</body>
+</html>
