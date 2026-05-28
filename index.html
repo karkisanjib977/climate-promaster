@@ -354,6 +354,49 @@ header {
 .fc-hi { color: var(--ink); }
 .fc-lo { color: #6f675d; }
 
+.hourly-block {
+  padding-top: 16px;
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.hourly-strip {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(54px, 1fr));
+  gap: 8px;
+}
+
+.hour-card {
+  min-height: 72px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.34);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+}
+
+.hour-time {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.3px;
+}
+
+.hour-icon {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.hour-temp {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
 /* Legend */
 .legend {
   position: fixed;
@@ -503,7 +546,10 @@ header {
 
 @media (max-width: 760px) {
   body {
+    height: auto;
+    min-height: 100dvh;
     min-width: 0;
+    overflow: auto;
   }
 
   header {
@@ -567,18 +613,23 @@ header {
 
   .app-body {
     flex-direction: column;
+    flex: none;
+    overflow: visible;
   }
 
   #map {
-    min-height: 42dvh;
+    height: 42dvh;
+    min-height: 330px;
+    flex: none;
   }
 
   .sidebar {
     width: 100%;
-    height: 42dvh;
-    min-height: 310px;
+    height: auto;
+    min-height: 0;
     border-left: none;
     border-top: 1px solid var(--border-md);
+    overflow: visible;
   }
 
   .sid-top {
@@ -608,6 +659,8 @@ header {
 
   .forecast-wrap {
     padding-block: 14px;
+    flex: none;
+    overflow: visible;
   }
 
   .legend {
@@ -618,6 +671,10 @@ header {
 
   .leaflet-control-attribution {
     display: none;
+  }
+
+  .hourly-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -644,8 +701,8 @@ header {
   }
 
   .sidebar {
-    height: 45dvh;
-    min-height: 330px;
+    height: auto;
+    min-height: 0;
   }
 
   .stats {
@@ -764,6 +821,10 @@ header {
     <div class="forecast-wrap">
       <div class="sec-label">5-day forecast</div>
       <div id="forecastList"></div>
+      <div class="hourly-block">
+        <div class="sec-label">Hourly temperature</div>
+        <div class="hourly-strip" id="hourlyList"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -926,6 +987,8 @@ function showPopup(lat, lon, d) {
 }
 
 function renderForecast(list) {
+  renderHourly(list);
+
   const byDay = {};
   list.forEach(item => {
     const date = new Date(item.dt * 1000);
@@ -960,6 +1023,27 @@ function renderForecast(list) {
         <span class="fc-lo">${display(lo)}°</span>
       </div>`;
     el.appendChild(row);
+  });
+}
+
+function renderHourly(list) {
+  const el = document.getElementById('hourlyList');
+  el.innerHTML = '';
+
+  list.slice(0, 8).forEach((item, i) => {
+    const date = new Date(item.dt * 1000);
+    const label = i === 0 ? 'Now' : date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      hour12: true
+    }).replace(' ', '');
+
+    const card = document.createElement('div');
+    card.className = 'hour-card';
+    card.innerHTML = `
+      <div class="hour-time">${label}</div>
+      <div class="hour-icon">${wxEmoji(item.weather[0].id)}</div>
+      <div class="hour-temp">${display(item.main.temp)}°</div>`;
+    el.appendChild(card);
   });
 }
 
